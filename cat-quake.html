@@ -148,6 +148,9 @@
             camera.position.set(0, 0, 0); // Камера в центре игрока
             playerObject.add(camera);
             
+            // Создание модели двуствольного ружья
+            createShotgun();
+            
             // Создание рендерера
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -398,6 +401,130 @@
             cat.mesh.position.y = 0;
         }
         
+        function createShotgun() {
+            // Создаем группу для оружия
+            const shotgun = new THREE.Group();
+            
+            // Материалы для ружья
+            const woodMaterial = new THREE.MeshLambertMaterial({ color: 0x6B4423 });
+            const metalMaterial = new THREE.MeshLambertMaterial({ color: 0x4A4A4A });
+            const barrelMaterial = new THREE.MeshLambertMaterial({ color: 0x2A2A2A });
+            const brassMaterial = new THREE.MeshLambertMaterial({ color: 0xB8860B });
+            
+            // Приклад (деревянная часть) - более реалистичная форма
+            const stockGeometry = new THREE.BoxGeometry(0.25, 0.15, 0.8);
+            const stock = new THREE.Mesh(stockGeometry, woodMaterial);
+            stock.position.set(0, -0.25, 0.2);
+            shotgun.add(stock);
+            
+            // Затыльник приклада
+            const buttPlateGeometry = new THREE.BoxGeometry(0.25, 0.15, 0.05);
+            const buttPlate = new THREE.Mesh(buttPlateGeometry, brassMaterial);
+            buttPlate.position.set(0, -0.25, -0.2);
+            shotgun.add(buttPlate);
+            
+            // Шейка приклада
+            const neckGeometry = new THREE.BoxGeometry(0.2, 0.12, 0.3);
+            const neck = new THREE.Mesh(neckGeometry, woodMaterial);
+            neck.position.set(0, -0.2, 0.05);
+            shotgun.add(neck);
+            
+            // Рукоятка (пистолетная рукоять)
+            const gripGeometry = new THREE.BoxGeometry(0.15, 0.25, 0.3);
+            const grip = new THREE.Mesh(gripGeometry, woodMaterial);
+            grip.position.set(0, -0.35, -0.1);
+            grip.rotation.x = 0.3;
+            shotgun.add(grip);
+            
+            // Уменьшенная коробка механизма
+            const actionGeometry = new THREE.BoxGeometry(0.25, 0.15, 0.4);
+            const action = new THREE.Mesh(actionGeometry, metalMaterial);
+            action.position.set(0, -0.1, -0.1);
+            shotgun.add(action);
+            
+            // Спусковой крючок
+            const triggerGeometry = new THREE.CylinderGeometry(0.02, 0.02, 0.12);
+            const trigger = new THREE.Mesh(triggerGeometry, metalMaterial);
+            trigger.position.set(0, -0.25, -0.05);
+            trigger.rotation.z = Math.PI / 2;
+            shotgun.add(trigger);
+            
+            // Спусковой крючок (основная часть)
+            const triggerGuardGeometry = new THREE.TorusGeometry(0.12, 0.03, 6, 12);
+            const triggerGuard = new THREE.Mesh(triggerGuardGeometry, metalMaterial);
+            triggerGuard.position.set(0, -0.25, -0.1);
+            triggerGuard.rotation.x = Math.PI / 2;
+            shotgun.add(triggerGuard);
+            
+            // Стволы (два ствола) - длиннее и толще
+            const barrelGeometry = new THREE.CylinderGeometry(0.08, 0.08, 2.0);
+            
+            const leftBarrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
+            leftBarrel.position.set(-0.1, 0, -1.2);
+            leftBarrel.rotation.x = Math.PI / 2;
+            shotgun.add(leftBarrel);
+            
+            const rightBarrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
+            rightBarrel.position.set(0.1, 0, -1.2);
+            rightBarrel.rotation.x = Math.PI / 2;
+            shotgun.add(rightBarrel);
+            
+            // Дульные сужения (чoke) под новый размер стволов
+            const chokeGeometry = new THREE.CylinderGeometry(0.075, 0.08, 0.1);
+            
+            const leftChoke = new THREE.Mesh(chokeGeometry, metalMaterial);
+            leftChoke.position.set(-0.1, 0, -2.1);
+            leftChoke.rotation.x = Math.PI / 2;
+            shotgun.add(leftChoke);
+            
+            const rightChoke = new THREE.Mesh(chokeGeometry, metalMaterial);
+            rightChoke.position.set(0.1, 0, -2.1);
+            rightChoke.rotation.x = Math.PI / 2;
+            shotgun.add(rightChoke);
+            
+            // Вентиляционные отверстия на стволах
+            const ventGeometry = new THREE.BoxGeometry(0.02, 0.01, 0.05);
+            
+            for (let i = 0; i < 6; i++) {
+                const leftVent = new THREE.Mesh(ventGeometry, metalMaterial);
+                leftVent.position.set(-0.08, 0.03, -0.8 - i * 0.2);
+                shotgun.add(leftVent);
+                
+                const rightVent = new THREE.Mesh(ventGeometry, metalMaterial);
+                rightVent.position.set(0.08, 0.03, -0.8 - i * 0.2);
+                shotgun.add(rightVent);
+            }
+            
+            // Прицельные приспособления убраны для более чистого вида
+            
+            // Эжекторы (рычаги выброса гильз)
+            const ejectorGeometry = new THREE.BoxGeometry(0.06, 0.02, 0.15);
+            
+            const leftEjector = new THREE.Mesh(ejectorGeometry, metalMaterial);
+            leftEjector.position.set(-0.08, 0.05, -0.3);
+            shotgun.add(leftEjector);
+            
+            const rightEjector = new THREE.Mesh(ejectorGeometry, metalMaterial);
+            rightEjector.position.set(0.08, 0.05, -0.3);
+            shotgun.add(rightEjector);
+            
+            // Предохранитель
+            const safetyGeometry = new THREE.BoxGeometry(0.08, 0.03, 0.12);
+            const safety = new THREE.Mesh(safetyGeometry, metalMaterial);
+            safety.position.set(0, -0.15, 0);
+            shotgun.add(safety);
+            
+            // Реалистичное позиционирование - стволы смотрят вперёд
+            shotgun.position.set(0.35, -0.25, -1.0);
+            shotgun.rotation.set(-0.15, 0.2, 0.05);
+            
+            // Прикрепляем ружье к камере
+            camera.add(shotgun);
+            
+            // Сохраняем ссылку для анимации
+            camera.shotgun = shotgun;
+        }
+        
         function setupControls() {
             // Клавиатура
             document.addEventListener('keydown', (event) => {
@@ -484,10 +611,26 @@
             scene.add(bullet);
             bullets.push(bullet);
             
-            // Эффект отдачи (более мягкий, не опускает под землю)
-            if (playerObject.position.y > 2) {
-                playerObject.position.y -= 0.01;
-            }
+            // Анимация стрельбы двустволки
+            animateShotgunRecoil();
+        }
+        
+        function animateShotgunRecoil() {
+            if (!camera.shotgun) return;
+            
+            const shotgun = camera.shotgun;
+            const originalPosition = shotgun.position.clone();
+            const originalRotation = shotgun.rotation.clone();
+            
+            // Анимация отдачи
+            shotgun.position.z += 0.1; // Отдача назад
+            shotgun.rotation.x -= 0.05; // Поднимаем ствол
+            
+            // Возвращаем в исходное положение через 100мс
+            setTimeout(() => {
+                shotgun.position.copy(originalPosition);
+                shotgun.rotation.copy(originalRotation);
+            }, 100);
         }
         
         function updatePlayer() {
@@ -511,21 +654,9 @@
             if (direction.length() > 0) {
                 direction.normalize();
                 
-                // Вычисляем новую позицию с проверкой коллизий
-                const newX = playerObject.position.x + direction.x * PLAYER_SPEED;
-                const newZ = playerObject.position.z + direction.z * PLAYER_SPEED;
-                
-                // Проверяем коллизии (радиус игрока = 0.5)
-                const validPos = getValidPosition(
-                    playerObject.position.x, 
-                    playerObject.position.z, 
-                    newX, 
-                    newZ, 
-                    0.5
-                );
-                
-                playerObject.position.x = validPos.x;
-                playerObject.position.z = validPos.z;
+                // Простое движение без строгих коллизий (для тестирования)
+                playerObject.position.x += direction.x * PLAYER_SPEED;
+                playerObject.position.z += direction.z * PLAYER_SPEED;
             }
                 
             // Прыжок
@@ -535,7 +666,7 @@
                 playerObject.position.y -= 0.1;
             }
             
-            // Ограничение области игры (внешние стены)
+            // Ограничение области игры (только внешние стены)
             playerObject.position.x = Math.max(-24, Math.min(24, playerObject.position.x));
             playerObject.position.z = Math.max(-24, Math.min(24, playerObject.position.z));
         }
@@ -550,21 +681,9 @@
                 direction.y = 0; // Игнорируем вертикальное движение
                 direction.normalize();
                 
-                // Вычисляем новую позицию с проверкой коллизий
-                const newX = cat.mesh.position.x + direction.x * cat.speed;
-                const newZ = cat.mesh.position.z + direction.z * cat.speed;
-                
-                // Проверяем коллизии с препятствиями (радиус кота = 0.4)
-                const validPos = getValidPosition(
-                    cat.mesh.position.x, 
-                    cat.mesh.position.z, 
-                    newX, 
-                    newZ, 
-                    0.4
-                );
-                
-                cat.mesh.position.x = validPos.x;
-                cat.mesh.position.z = validPos.z;
+                // Простое движение без строгих коллизий (для тестирования)
+                cat.mesh.position.x += direction.x * cat.speed;
+                cat.mesh.position.z += direction.z * cat.speed;
                 
                 // Поворот кота к игроку
                 cat.mesh.lookAt(playerObject.position);
