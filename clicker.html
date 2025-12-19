@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cabybara clicker by SMG Guy</title>
+</head>
+
+<body>
+    <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQPUHdhZ4-bbhWDKI3ItV4hTMB61JkMvqF0nQ&s" alt="">
+
+    <div class="counter" id="counter">0</div>
+
+    <button class="plus" onclick="plus()">+1</button>
+    <button class="minus" onclick="minus()">-1</button>
+    <button class="reset" onclick="reset()">reset</button>
+
+
+    <script>
+        let count = 0
+
+        function plus() {
+            count++
+            document.getElementById("counter").textContent = count
+        }
+
+        function minus() {
+            count--
+            document.getElementById("counter").textContent = count
+        }
+
+        function reset() {
+            count = 0
+            document.getElementById("counter").textContent = count
+        }
+
+    </script>
+</body>
+
+</html>

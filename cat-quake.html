@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cat Quake - 3D</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Courier New', monospace;
+        }
+        
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #game-canvas {
+            display: block;
+        }
+        
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #ff0000;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px #000;
+            z-index: 100;
+        }
+        
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ff0000;
+            border-radius: 50%;
+            z-index: 100;
+            pointer-events: none;
+        }
+        
+        #weapon {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 100px;
+            height: 60px;
+            background: linear-gradient(45deg, #333, #666);
+            border: 2px solid #000;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ff0000;
+            font-weight: bold;
+        }
+        
+        #instructions {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: #ff0000;
+            padding: 30px;
+            border: 2px solid #ff0000;
+            text-align: center;
+            z-index: 200;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="instructions">
+            <h1>CAT QUAKE</h1>
+            <p>Убейте всех агрессивных котов!</p>
+            <p>WASD - движение</p>
+            <p>Мышь - прицеливание</p>
+            <p>ЛКМ - стрельба</p>
+            <p>Пробел - прыжок</p>
+            <button onclick="startGame()" style="background: #ff0000; color: white; border: none; padding: 10px 20px; font-size: 18px; cursor: pointer;">НАЧАТЬ</button>
+        </div>
+        
+        <div id="hud">
+            <div>Здоровье: <span id="health">100</span></div>
+            <div>Очки: <span id="score">0</span></div>
+            <div>Коты: <span id="cats-left">10</span></div>
+        </div>
+        
+        <div id="crosshair"></div>
+        
+        <div id="weapon">
+            ДВУСТВОЛКА
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Глобальные переменные игры
+        let scene, camera, renderer, playerObject;
+        let cats = [];
+        let bullets = [];
+        let keys = {};
+        let mouse = { x: 0, y: 0 };
+        let gameStarted = false;
+        let gameEnded = false;
+        let health = 100;
+        let score = 0;
+        let catsRemaining = 10;
+        
+        // Переменные для управления камерой
+        let cameraPitch = 0;
+        let cameraYaw = 0;
+        
+        // Константы
+        const CAT_COUNT = 10;
+        const MAX_CATS = 10;
+        const PLAYER_SPEED = 0.1;
+        const BULLET_SPEED = 0.5;
+        const CAT_SPEED = 0.02;
+        const CAT_RESPAWN_TIME = 3000; // 3 секунды
+        
+        // Инициализация игры
+        function init() {
+            // Создание сцены
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x111111);
+            scene.fog = new THREE.Fog(0x111111, 10, 100);
+            
+            // Создание объекта игрока
+            playerObject = new THREE.Object3D();
+            playerObject.position.set(0, 2, 0);
+            scene.add(playerObject);
+            
+            // Создание камеры и прикрепление к игроку
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 0); // Камера в центре игрока
+            playerObject.add(camera);
+            
+            // Создание рендерера
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('game-container').appendChild(renderer.domElement);
+            
+            // Создание освещения
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 10, 5);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+            
+            // Создание пола
+            createFloor();
+            
+            // Создание стен
+            createWalls();
+            
+            // Создание котов
+            createCats();
+            
+            // Настройка управления
+            setupControls();
+            
+            // Запуск игрового цикла
+            animate();
+        }
+        
+        function createFloor() {
+            const floorGeometry = new THREE.PlaneGeometry(50, 50);
+            const floorMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x222222,
+                side: THREE.DoubleSide 
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+        }
+        
+        function createWalls() {
+            // Создание более интересной арены с препятствиями
+            const wallMaterial = new THREE.MeshLambertMaterial({ color: 0x666666 });
+            const obstacleMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+            
+            // Внешние стены
+            const walls = [
+                { pos: [0, 2.5, -25], size: [50, 5, 1] },
+                { pos: [0, 2.5, 25], size: [50, 5, 1] },
+                { pos: [-25, 2.5, 0], size: [1, 5, 50] },
+                { pos: [25, 2.5, 0], size: [1, 5, 50] }
+            ];
+            
+            walls.forEach(wall => {
+                const geometry = new THREE.BoxGeometry(...wall.size);
+                const mesh = new THREE.Mesh(geometry, wallMaterial);
+                mesh.position.set(...wall.pos);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                scene.add(mesh);
+            });
+            
+            // Внутренние препятствия
+            const obstacles = [
+                { pos: [0, 1, 0], size: [8, 2, 2] },
+                { pos: [0, 1, 10], size: [2, 2, 8] },
+                { pos: [-10, 1, -10], size: [6, 2, 6] },
+                { pos: [10, 1, -10], size: [6, 2, 6] },
+                { pos: [-10, 1, 10], size: [6, 2, 6] },
+                { pos: [10, 1, 10], size: [6, 2, 6] },
+                { pos: [-15, 1, 0], size: [2, 2, 10] },
+                { pos: [15, 1, 0], size: [2, 2, 10] }
+            ];
+            
+            obstacles.forEach(obstacle => {
+                const geometry = new THREE.BoxGeometry(...obstacle.size);
+                const mesh = new THREE.Mesh(geometry, obstacleMaterial);
+                mesh.position.set(...obstacle.pos);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                scene.add(mesh);
+            });
+        }
+        
+        function createCat() {
+            const catGroup = new THREE.Group();
+            
+            // Тело кота (низкополигональное)
+            const bodyGeometry = new THREE.BoxGeometry(0.8, 0.6, 1.2);
+            const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.3;
+            catGroup.add(body);
+            
+            // Голова кота
+            const headGeometry = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+            const headMaterial = new THREE.MeshLambertMaterial({ color: 0xA0522D });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.set(0, 0.6, 0.4);
+            catGroup.add(head);
+            
+            // Уши
+            const earGeometry = new THREE.ConeGeometry(0.15, 0.3, 4);
+            const earMaterial = new THREE.MeshLambertMaterial({ color: 0x654321 });
+            
+            const leftEar = new THREE.Mesh(earGeometry, earMaterial);
+            leftEar.position.set(-0.2, 0.9, 0.3);
+            leftEar.rotation.x = Math.PI;
+            catGroup.add(leftEar);
+            
+            const rightEar = new THREE.Mesh(earGeometry, earMaterial);
+            rightEar.position.set(0.2, 0.9, 0.3);
+            rightEar.rotation.x = Math.PI;
+            catGroup.add(rightEar);
+            
+            // Хвост
+            const tailGeometry = new THREE.CylinderGeometry(0.05, 0.1, 0.8);
+            const tailMaterial = new THREE.MeshLambertMaterial({ color: 0x654321 });
+            const tail = new THREE.Mesh(tailGeometry, tailMaterial);
+            tail.position.set(0, 0.4, -0.8);
+            tail.rotation.x = Math.PI / 2;
+            catGroup.add(tail);
+            
+            // Ноги
+            const legGeometry = new THREE.BoxGeometry(0.15, 0.4, 0.15);
+            const legMaterial = new THREE.MeshLambertMaterial({ color: 0x654321 });
+            
+            const positions = [
+                [-0.25, 0.2, 0.4], [0.25, 0.2, 0.4],
+                [-0.25, 0.2, -0.4], [0.25, 0.2, -0.4]
+            ];
+            
+            positions.forEach(pos => {
+                const leg = new THREE.Mesh(legGeometry, legMaterial);
+                leg.position.set(...pos);
+                catGroup.add(leg);
+            });
+            
+            return catGroup;
+        }
+        
+        function createCats() {
+            for (let i = 0; i < MAX_CATS; i++) {
+                const cat = createCat();
+                
+                // Случайная позиция для кота
+                const pos = getRandomCatPosition();
+                cat.position.set(pos.x, pos.y, pos.z);
+                
+                scene.add(cat);
+                cats.push({
+                    mesh: cat,
+                    health: 100,
+                    speed: CAT_SPEED * (0.5 + Math.random() * 0.5),
+                    lastAttack: 0,
+                    isDead: false,
+                    respawnTime: 0
+                });
+            }
+        }
+        
+        function getRandomCatPosition() {
+            let x, z;
+            let attempts = 0;
+            
+            do {
+                x = (Math.random() - 0.5) * 40;
+                z = (Math.random() - 0.5) * 40;
+                attempts++;
+                
+                // Проверка, чтобы кот не появился слишком близко к игроку или в препятствии
+            } while ((Math.sqrt(x * x + z * z) < 5 || isPositionBlocked(x, z)) && attempts < 20);
+            
+            return { x, y: 0, z };
+        }
+        
+        function isPositionBlocked(x, z, radius = 0.5) {
+            // Проверка на препятствия (только внутренние блоки, внешние стены обрабатываются отдельно)
+            const obstacles = [
+                // Внутренние препятствия (уменьшенные радиусы)
+                { x: 0, z: 0, radius: 3.5 },
+                { x: 0, z: 10, radius: 3.5 },
+                { x: -10, z: -10, radius: 2.5 },
+                { x: 10, z: -10, radius: 2.5 },
+                { x: -10, z: 10, radius: 2.5 },
+                { x: 10, z: 10, radius: 2.5 },
+                { x: -15, z: 0, radius: 3.0 },
+                { x: 15, z: 0, radius: 3.0 }
+            ];
+            
+            return obstacles.some(obstacle => {
+                const distance = Math.sqrt((x - obstacle.x) ** 2 + (z - obstacle.z) ** 2);
+                return distance < (obstacle.radius + radius);
+            });
+        }
+            
+        function checkCollision(newX, newZ, radius = 0.5) {
+            return isPositionBlocked(newX, newZ, radius);
+        }
+        
+        function getValidPosition(currentX, currentZ, newX, newZ, radius = 0.5) {
+            // Проверяем, можно ли двигаться в новую позицию
+            if (!checkCollision(newX, newZ, radius)) {
+                return { x: newX, z: newZ };
+            }
+            
+            // Если коллизия, пробуем двигаться только по одной оси
+            if (!checkCollision(newX, currentZ, radius)) {
+                return { x: newX, z: currentZ };
+            }
+            
+            if (!checkCollision(currentX, newZ, radius)) {
+                return { x: currentX, z: newZ };
+            }
+            
+            // Если все еще коллизия, пробуем двигаться на половину расстояния
+            const halfDistanceX = (newX - currentX) * 0.5;
+            const halfDistanceZ = (newZ - currentZ) * 0.5;
+            
+            if (!checkCollision(currentX + halfDistanceX, currentZ + halfDistanceZ, radius)) {
+                return { x: currentX + halfDistanceX, z: currentZ + halfDistanceZ };
+            }
+            
+            // Если нельзя двигаться, остаемся на месте
+            return { x: currentX, z: currentZ };
+        }
+            
+        function respawnCat(catIndex) {
+            const cat = cats[catIndex];
+            if (!cat) return;
+            
+            // Получаем новую позицию
+            const pos = getRandomCatPosition();
+            cat.mesh.position.set(pos.x, pos.y, pos.z);
+            
+            // Восстанавливаем здоровье и состояние
+            cat.health = 100;
+            cat.isDead = false;
+            cat.respawnTime = 0;
+            cat.lastAttack = 0;
+            
+            // Возвращаем кота к нормальному положению
+            cat.mesh.rotation.z = 0;
+            cat.mesh.position.y = 0;
+        }
+        
+        function setupControls() {
+            // Клавиатура
+            document.addEventListener('keydown', (event) => {
+                keys[event.code] = true;
+            });
+            
+            document.addEventListener('keyup', (event) => {
+                keys[event.code] = false;
+            });
+            
+            // Мышь для поворота камеры
+            document.addEventListener('mousemove', (event) => {
+                if (gameStarted && !gameEnded && document.pointerLockElement === renderer.domElement) {
+                    const movementX = event.movementX || 0;
+                    const movementY = event.movementY || 0;
+                    
+                    // Поворот игрока (yaw) и камеры (pitch)
+                    cameraYaw -= movementX * 0.003; // Поворот влево/вправо
+                    cameraPitch -= movementY * 0.003; // Поворот вверх/вниз
+                    
+                    // Ограничение поворота по вертикали
+                    cameraPitch = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, cameraPitch));
+                    
+                    // Применяем повороты
+                    playerObject.rotation.y = cameraYaw;
+                    camera.rotation.x = cameraPitch;
+                }
+            });
+            
+            document.addEventListener('click', (event) => {
+                if (gameStarted && !gameEnded) {
+                    shoot();
+                }
+            });
+            
+            // Обработка pointer lock
+            document.addEventListener('pointerlockchange', () => {
+                if (document.pointerLockElement === renderer.domElement) {
+                    console.log('✅ Pointer lock активирован - управление мышью работает!');
+                } else {
+                    console.log('❌ Pointer lock деактивирован - управление мышью не работает');
+                }
+            });
+            
+            // Обработка ошибок pointer lock
+            document.addEventListener('pointerlockerror', () => {
+                console.log('❌ Ошибка при активации pointer lock');
+                alert('Не удалось активировать захват мыши. Попробуйте обновить страницу.');
+            });
+        }
+        
+        function startGame() {
+            document.getElementById('instructions').classList.add('hidden');
+            gameStarted = true;
+            
+            // Захват мыши
+            renderer.domElement.requestPointerLock();
+            
+            // Отладочная информация
+            console.log('Игра началась, пытаемся активировать pointer lock...');
+            
+            // Если pointer lock не сработал, показываем сообщение
+            setTimeout(() => {
+                if (document.pointerLockElement !== renderer.domElement) {
+                    alert('Пожалуйста, нажмите на экран и разрешите захват мыши для лучшего управления!');
+                } else {
+                    console.log('Pointer lock активирован успешно!');
+                }
+            }, 1000);
+        }
+        
+        function shoot() {
+            const bulletGeometry = new THREE.SphereGeometry(0.1);
+            const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+            const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+            
+            bullet.position.copy(playerObject.position);
+            
+            // Направление пули (вперёд от камеры)
+            const direction = new THREE.Vector3();
+            camera.getWorldDirection(direction);
+            bullet.velocity = direction.multiplyScalar(BULLET_SPEED);
+            
+            scene.add(bullet);
+            bullets.push(bullet);
+            
+            // Эффект отдачи (более мягкий, не опускает под землю)
+            if (playerObject.position.y > 2) {
+                playerObject.position.y -= 0.01;
+            }
+        }
+        
+        function updatePlayer() {
+            if (!gameStarted || gameEnded) return;
+            
+            const direction = new THREE.Vector3();
+            
+            // Движение на основе поворота игрока (yaw)
+            const forward = new THREE.Vector3(0, 0, -1);
+            forward.applyAxisAngle(new THREE.Vector3(0, 1, 0), playerObject.rotation.y);
+            
+            const right = new THREE.Vector3(1, 0, 0);
+            right.applyAxisAngle(new THREE.Vector3(0, 1, 0), playerObject.rotation.y);
+            
+            // Логика движения
+            if (keys['KeyW']) direction.add(forward);    // Вперёд
+            if (keys['KeyS']) direction.sub(forward);    // Назад
+            if (keys['KeyA']) direction.sub(right);      // Влево
+            if (keys['KeyD']) direction.add(right);      // Вправо
+            
+            if (direction.length() > 0) {
+                direction.normalize();
+                
+                // Вычисляем новую позицию с проверкой коллизий
+                const newX = playerObject.position.x + direction.x * PLAYER_SPEED;
+                const newZ = playerObject.position.z + direction.z * PLAYER_SPEED;
+                
+                // Проверяем коллизии (радиус игрока = 0.5)
+                const validPos = getValidPosition(
+                    playerObject.position.x, 
+                    playerObject.position.z, 
+                    newX, 
+                    newZ, 
+                    0.5
+                );
+                
+                playerObject.position.x = validPos.x;
+                playerObject.position.z = validPos.z;
+            }
+                
+            // Прыжок
+            if (keys['Space'] && playerObject.position.y <= 2) {
+                playerObject.position.y += 0.1;
+            } else if (playerObject.position.y > 2) {
+                playerObject.position.y -= 0.1;
+            }
+            
+            // Ограничение области игры (внешние стены)
+            playerObject.position.x = Math.max(-24, Math.min(24, playerObject.position.x));
+            playerObject.position.z = Math.max(-24, Math.min(24, playerObject.position.z));
+        }
+        
+        function updateCats() {
+            cats.forEach((cat, index) => {
+                if (cat.health <= 0 || cat.isDead) return;
+                
+                // Движение к игроку
+                const direction = new THREE.Vector3();
+                direction.subVectors(playerObject.position, cat.mesh.position);
+                direction.y = 0; // Игнорируем вертикальное движение
+                direction.normalize();
+                
+                // Вычисляем новую позицию с проверкой коллизий
+                const newX = cat.mesh.position.x + direction.x * cat.speed;
+                const newZ = cat.mesh.position.z + direction.z * cat.speed;
+                
+                // Проверяем коллизии с препятствиями (радиус кота = 0.4)
+                const validPos = getValidPosition(
+                    cat.mesh.position.x, 
+                    cat.mesh.position.z, 
+                    newX, 
+                    newZ, 
+                    0.4
+                );
+                
+                cat.mesh.position.x = validPos.x;
+                cat.mesh.position.z = validPos.z;
+                
+                // Поворот кота к игроку
+                cat.mesh.lookAt(playerObject.position);
+                
+                // Атака кота
+                const distance = cat.mesh.position.distanceTo(playerObject.position);
+                if (distance < 2 && Date.now() - cat.lastAttack > 1000) {
+                    health -= 10;
+                    cat.lastAttack = Date.now();
+                    updateHUD();
+                    
+                    if (health <= 0) {
+                        endGame(false);
+                    }
+                }
+            });
+        }
+        
+        function updateBullets() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+                bullet.position.add(bullet.velocity);
+                
+                // Удаление пули, если она вышла за пределы
+                if (Math.abs(bullet.position.x) > 50 || 
+                    Math.abs(bullet.position.z) > 50) {
+                    scene.remove(bullet);
+                    bullets.splice(i, 1);
+                    continue;
+                }
+                
+                // Проверка столкновений с котами
+                cats.forEach((cat, catIndex) => {
+                    if (cat.health > 0 && !cat.isDead) {
+                        const distance = bullet.position.distanceTo(cat.mesh.position);
+                        if (distance < 1) {
+                            // Попадание!
+                            cat.health -= 50;
+                            if (cat.health <= 0) {
+                                score += 100;
+                                cat.isDead = true;
+                                cat.respawnTime = Date.now() + CAT_RESPAWN_TIME;
+                                updateHUD();
+                                
+                                // Визуальный эффект смерти
+                                cat.mesh.rotation.z = Math.PI / 2;
+                                cat.mesh.position.y = -1;
+                                
+                                console.log('🐱 Кот убит! +100 очков');
+                            }
+                            
+                            // Удаление пули
+                            scene.remove(bullet);
+                            bullets.splice(i, 1);
+                        }
+                    }
+                });
+            }
+        }
+                
+        function updateRespawn() {
+            const currentTime = Date.now();
+            let respawnedCount = 0;
+            
+            cats.forEach((cat, index) => {
+                if (cat.isDead && currentTime >= cat.respawnTime) {
+                    respawnCat(index);
+                    respawnedCount++;
+                }
+            });
+            
+            if (respawnedCount > 0) {
+                console.log(`🐱 ${respawnedCount} котов воскресли!`);
+            }
+        }
+        
+        function updateHUD() {
+            document.getElementById('health').textContent = health;
+            document.getElementById('score').textContent = score;
+            document.getElementById('cats-left').textContent = cats.filter(cat => !cat.isDead).length;
+            
+            // Проверка условий победы - набрать 1000 очков (10 котов по 100 очков)
+            if (score >= 1000) {
+                endGame(true);
+            }
+        }
+        
+        function endGame(won) {
+            gameEnded = true;
+            const message = won ? 'ПОБЕДА!' : 'ПОРАЖЕНИЕ!';
+            const scoreText = `Ваш счёт: ${score}`;
+            
+            document.getElementById('instructions').innerHTML = `
+                <h1>${message}</h1>
+                <p>${scoreText}</p>
+                <button onclick="location.reload()" style="background: #ff0000; color: white; border: none; padding: 10px 20px; font-size: 18px; cursor: pointer;">ИГРАТЬ СНОВА</button>
+            `;
+            document.getElementById('instructions').classList.remove('hidden');
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            updatePlayer();
+            updateCats();
+            updateBullets();
+            updateRespawn();
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Обработка изменения размера окна
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Запуск игры после загрузки страницы
+        window.addEventListener('load', () => {
+            init();
+        });
+    </script>
+</body>
+</html>
